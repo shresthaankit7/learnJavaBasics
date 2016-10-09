@@ -1,0 +1,203 @@
+
+Mastering the Java CLASSPATH
+The significance of the class search path
+An understanding of the class search path is important for all Java developers. However, the widespread use of integrated development tools has concealed the technicalities for so long that there is a widespread lack of comprehension, even among experienced developers. The problem is particularly acute with development of distributed applications, as the system which will run the application is likely to be configured rather differently from the one on which development takes place.
+
+This article describes in detail how the Java compiler and the JVM use the class search path to locate classes when they are referenced by other Java code. It does this with reference to a very simple example, which uses two classes in the same package. We will see how various operations to compile these two classes succeed and fail, depending on the class path setting.
+
+To make things absolutely clear, we will use only simple command-line tools to carry out the compile operations. Interactive development tools have their own ways of manipulating the class path, which vary from product to product.
+
+There is no fundamental difference between the way that the Java compiler searches for classes, and the way that the JVM does it at run time. However, the compiler has the ability to compile classes from source code, where the JVM does not. In the examples below we will use the compiler, but similar issues apply at run time.
+The example
+This example has two trivial classes: com.web_tomorrow.CPTest1 and com.web_tomorrow.CPTest2, which are listed below.
+
+package com.web_tomorrow;
+public class CPTest1
+{
+public static void main(String[] args)
+  {
+  System.out.println ("Run CPTest1.main()");
+  }
+}
+
+package com.web_tomorrow;
+public class CPTest2
+{
+public static void main(String[] args)
+  {
+  System.out.println ("Run CPTest2.main()");
+  CPTest1 cpt1 = new CPTest1();
+  }
+}
+
+One of the most fundamental rules of Java code organization is that `package name = directory name'. We will begin by setting up a directory structure that matches the package assignment of these two classes. The classes are in a package com.web_tomorrow, so we must create the directory com/web_tomorrow to contain the source code.
+
+[root]
+  com
+    web_tomorrow
+      CPTest1.java
+      CPTest2.java
+
+In this document I will use the notation [root]' to mean whatever directory contains the structure described above', that is, the root of the directory layout. This will vary, of course, according to how you install the files.
+Basic principles
+Let's try to compile CPTest1.java on its own using the command-line javac program. To disable the class search path completely (so any existing setting does not interfere with the example), we can run javac with the option `-classpath ""'.
+
+As a first attempt, let's change directory to the location of CPTest1.java, and try to compile it by specifying its name on the javac command line.
+
+cd [root]/com/web_tomorrow
+javac -classpath "" CPTest1.java
+
+This operation succeeds, because the compiler is able to find CPTest1.java (it is in the working directory), and because CPTest1 does not reference any other classes. The output file, CPTest1.class ends up in the same directory as CPTest1.java because, again, you haven't given the compiler information to do anything else. So far so good. Now let's try the same thing with CPTest2. Still in the `web_tomorrow' directory, execute this command:
+
+javac -classpath "" CPTest2.java
+
+This operation should fail, even though the directory is the same as the previous step, and CPTest1 and CPTest2 are in the same package. The error message will be something like this:
+
+PTest2.java:7: cannot resolve symbol
+symbol  : class CPTest1
+location: class com.web_tomorrow.CPTest2
+  CPTest1 cpt1 = new CPTest1();
+  ^
+
+The difference between this case and the previous, successful, one is that CPTest2 contains a reference to CPTest1:
+
+  CPTest1 cpt1 = new CPTest1();
+
+What is going on here? When the compiler encounters the reference to CP1Test here, it assumes that this is a class in the same package as CP2Test that is is currently compiling. This is a correct assumption. So the compiler needs to find com.web_tomorrow.CP1Test. But it has nowhere to look, as we have explicitly set the class search path to "" (i.e., nothing).
+
+You might think this problem can be resolved by telling the compiler to look in the current directory. The standard symbol for `current directory' is a single period (.) in both Unix and Windows systems. So try something like this:
+
+javac -classpath "." CPTest2.java
+
+This fails in exactly the same way as the previous example. The problem now is that although CPTest1.java is in the current directory, the class that it implements is not just CPTest1, but com.web_tomorrow.CPTest1. The compiler will look for a directory com/web_tomorrow below the current directory. So, overall, it is looking for a Java source or class file in the directory [home]/com/web_tomorrow/com/web_tomorrow which, of course, does not exist.
+
+To make this compile operation work, we need to make the class search path reference not the directory containing CPTest1, but a directory root from which CPTest1 can be located by the compiler following the standard Java `package name = directory name' rule. This should work, although it's rather ugly:
+
+javac -classpath "../.." CPTest2.java
+
+Before seeing how we can make this less ugly, consider this example (still in the same directory):
+
+javac -classpath "" CPTest1.java CPTest2.java
+
+This also works, even though the class path is empty. This is because the Java compiler will look for references between any source code explicitly listed on the command line. If there are many classes, all in the same directory, we can simplify this to:
+
+javac -classpath "" *.java
+
+The `*.java' expands to a list of all the .java files in the current directory. This explains why compiling many files in one operation often succeeds where attempts to compile a single file fails.
+
+A more convenient way to compile CPTest2 on its own is like this:
+
+cd [root]
+javac -classpath "." com/web_tomorrow/CPTest2.java
+
+In this example we specify the full path to CPTest2.java, but include `.' in the -classpath option. Again, we aren't telling the compiler to look for files in the current directory, we are telling it to begin a class search from the current directory. Because the class we are looking for is com.web_tomorrow.CPTest1, the compiler will search in ./com/web_tomorrow (that is, the directory com/web_tomorrow below the current directory). This is exactly where CPTest1.java is located.
+
+In fact, even though I only specified CPTest2 on the command line, this practice does in fact lead to the compilation of CPTest1 as well. The compiler finds the .java file in the right place, but it can't tell whether this Java source really implements the right class, so it has to compile it. But note that if we do this:
+
+cd [root]
+javac -classpath "." com/web_tomorrow/CPTest1.java
+
+it does not cause a compilation of CPTest2.java, because the compiler does not need to know anything about CPTest2 to compile CPTest1.
+.class files separate from .java files
+The examples described so far, when successful, place the output .class files alongside the .java files from which they were generated. This is a simple scheme, and very widely used. However, many developers like to keep the source tree free of generated files, and must therefore tell the Java compiler to maintain separate directories for .class files. Let's see what impact this has on the class search path.
+
+To begin we will need to delete any .class files lurking around after the previous examples. We will also contain a new directory classes to contain the generated .class files. The procedure at the command line would be something like this:
+
+cd [root]
+rm com/web_tomorrow/*.class
+mkdir classes
+
+Don't forget to swap the `/' characters for '\' if you are using a Windows system. The directory structure now looks like this.
+
+[root]
+  com
+    web_tomorrow
+      CPTest1.java
+      CPTest2.java
+  classes
+
+Let's compile CPTest1.java, specifying classes as the destination directory (using the -d option):
+
+cd [root]
+javac -d classes -classpath "" com/web_tomorrow/CPTest1.java
+
+This should succeed, but you should notice that the .class files have not been placed into the classes directory at all. Instead, we have a new directory structure like this:
+
+[root]
+  com
+    web_tomorrow
+      CPTest1.java
+      CPTest2.java
+  classes
+    com
+      web_tomorrow
+        CPTest1.class
+
+What has happened is that the compiler has created a directory structure to match the package structure. It has done this to be helpful, as we shall see. When we come to compile CPTest2.java we have two choices. First, we can compile it as described above, allowing the compiler to compile CPTest1 as part of the process. Alternatively, we can compile it and use the -classpath option to refer to the compiler to the .class file generated in the previous step. This method is superior, as we don't have to repeat the compilation of CPTest1.
+
+cd [root]
+javac -d classes -classpath classes com/web_tomorrow/CPTest2.java
+
+By doing this, we end up with this directory structure.
+
+[root]
+  com
+    web_tomorrow
+      CPTest1.java
+      CPTest2.java
+  classes
+    com
+      web_tomorrow
+      CPTest1.class
+      CPTest2.class
+
+Of course we could have compiled both .java files in the same command, and got the same result.
+JARs on the classpath
+The java compiler and run-time can search for classes not only in separate files, but also in `JAR' archives. A JAR file can maintain its own directory structure, and Java follows exactly the same rules as for searching in ordinary directories. Specifically, `directory name = package name'. Because a JAR is itself a directory, to include a JAR file in the class search path, the path must reference the JAR itself, not merely the directory that contains the JAR. This is a very common error. Suppose I have a JAR myclasses.jar in directory /myclasses. To have the Java compiler look for classes in this jar, we need to specify:
+
+javac -classpath /myclasses/myclasses.jar ...
+
+and not merely the directory myclasses.
+Multiple class search directories
+In the examples above, we have told javac to search in only one directory at a time. In practice, your class search path will contain numerous directories and JAR archives. The -classpath option to javac and java allows multiple entries to be specified, but notice that the syntax is slightly different for Unix and Windows systems.
+
+On Unix, we would do this:
+
+javac -classpath dir1:dir2:dir3 ...
+
+whereas on Windows we have:
+
+javac -classpath dir1;dir2;dir3 ...
+
+The reason for the difference is that Windows uses the colon (:) character as part of a filename, so it can't be used as a filename separator. Naturally the directory separator character is different as well: forward slash (/) for Unix and backslash (\) for Windows.
+System classpath
+Rather than specifying class search path on the javac command line, we can make use of a `system' class path. This is the class path that will be used by both the Java compiler and the JVM in the absence of specific instructions to the contrary. In both Unix and Windows systems, this is done by setting an environment variable. For example, in Linux with the bash shell:
+
+CLASSPATH=/myclasses/myclasses.jar;export CLASSPATH
+
+and in Windows:
+
+set CLASSPATH=c:\myclasses\myclasses.jar
+
+This procedure is fine for short-term changes to the system CLASSPATH, but if you want these changes to be persistent you will need to arrange this yourself. Details vary from system to system. On a Linux system, for example, I would put the commands in the file .bashrc in my home directory. On Windows 2000/NT there is a `Control Panel' page for this.
+
+Setting the system CLASSPATH is a useful procedure if you have JARs full of classes that you use all the time. For example, if I am developing Enterprise JavaBean (EJB) applications using Sun's J2EE `Reference Implementation', all the EJB-related classes are in a JAR called `j2ee.jar' that comes with the distribution. I want this JAR on the class search path all the time. In addition, most people want to ensure that the current directory is on the search path, whatever the current directory happens to be. So in my .bashrc file I have this line:
+
+CLASSPATH=/usr/j2ee/j2ee.jar:.;export CLASSPATH
+
+where the .' indicates current directory'.
+
+It is easy to overlook that the -classpath option on the command line replaces the default, system class path; it does not add to it. So what should I do if I want to set the class path to include the default system classpath plus some other entries? I could simply use the -classpath option and list the default entries in addition to my extras. However, a better way is to reference the CLASSPATH environment variable. The syntax for this is different — of course — on Windows and Unix systems. On Unix:
+
+javac -classpath $CLASSPATH:dir1:dir2 ...
+
+where $CLASSPATH expands to the current setting of the CLASSPATH environment variable. On Windows:
+
+javac -classpath %CLASSPATH%;dir1:dir2 ...
+
+Finally, please note that if directories in your class search path have spaces in their names, you may have to use double-quotes on the command line to prevent the CLASSPATH being split up. For example:
+
+javac -classpath "%CLASSPATH%";dir1:dir2 ...
+
+Copyright © 1994-2013 Kevin Boone. Updated Feb 08 2013
+
