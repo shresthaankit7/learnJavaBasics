@@ -1,0 +1,9 @@
+.idea/*
+
+*.class
+
+target/*
+
+EnvironmentVariable/*
+
+test.java
