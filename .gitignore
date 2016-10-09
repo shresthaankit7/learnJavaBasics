@@ -1,7 +1,6 @@
-.idea/*
 
 target/*
 
-EnvironmentVariable/*
+.idea/
 
-test.java
+EnvironmentVariable/
