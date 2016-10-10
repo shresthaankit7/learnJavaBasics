@@ -1,0 +1,5 @@
+Create Jar:
+jar cfe ClassWithDependencies.jar com/ankit/MainClass com/ankit/*.class package2/ankit/*.class
+
+Run Jar:
+java -jar ClassWithDependencies.jar
