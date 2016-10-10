@@ -1,0 +1,1 @@
+jar cfe ClassPath.jar Class1 *.class

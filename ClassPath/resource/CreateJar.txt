@@ -1,0 +1,14 @@
+Setting an Entry Point with the JAR Tool
+
+The 'e' flag (for 'entrypoint') creates or overrides the manifest's Main-Class attribute. It can be used while creating or updating a JAR file. Use it to specify the application entry point without editing or creating the manifest file.
+For example, this command creates app.jar where the Main-Class attribute value in the manifest is set to MyApp:
+
+jar cfe app.jar MyApp MyApp.class
+
+You can directly invoke this application by running the following command:
+
+java -jar app.jar
+
+If the entrypoint class name is in a package it may use a '.' (dot) character as the delimiter. For example, if Main.class is in a package called foo the entry point can be specified in the following ways:
+
+jar cfe Main.jar foo.Main foo/Main.class
